@@ -180,14 +180,42 @@ local function get_xml_context()
 	local start_dir = vim.fs.dirname(file)
 	local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
+	local cursor = vim.api.nvim_win_get_cursor(0)
+	local cur_line = cursor[1]
+	local cur_text = lines[cur_line]
+	local cur_col = cursor[2]
+	if cur_text then
+		local refid = cur_text:match('<include[^>]-refid%s*=%s*"([^"]+)"')
+			or cur_text:match("<include[^>]-refid%s*=%s*'([^']+)'")
+		if refid then
+			return {
+				type = "include",
+				file = file,
+				lines = lines,
+				refid = refid,
+			}
+		end
+
+		local rs, re, result_map = cur_text:find('resultMap%s*=%s*"([^"]+)"')
+		if not rs then
+			rs, re, result_map = cur_text:find("resultMap%s*=%s*'([^']+)'")
+		end
+		if rs and cur_col + 1 >= rs and cur_col + 1 <= re then
+			return {
+				type = "resultMap_ref",
+				file = file,
+				lines = lines,
+				result_map = result_map,
+			}
+		end
+	end
+
 	local namespace = extract_namespace(lines)
 	if not namespace then
 		return nil
 	end
 	local class = namespace:match("([%w_]+)$") or namespace
 
-	local cursor = vim.api.nvim_win_get_cursor(0)
-	local cur_line = cursor[1]
 	local method
 	for lnum = cur_line, 1, -1 do
 		local line = lines[lnum]
@@ -205,12 +233,29 @@ local function get_xml_context()
 	end
 
 	return {
+		type = "mapper",
 		file = file,
 		dir = start_dir,
 		namespace = namespace,
 		class = class,
 		method = method,
 	}
+end
+
+local function find_local_defs(lines, file, tags, target_id)
+	local hits = {}
+	for i, line in ipairs(lines) do
+		for _, tag in ipairs(tags) do
+			local pat1 = "<" .. tag .. '[^>]-id%s*=%s*"' .. vim.pesc(target_id) .. '"'
+			local pat2 = "<" .. tag .. "[^>]-id%s*=%s*'" .. vim.pesc(target_id) .. "'"
+			local pos = line:find(pat1) or line:find(pat2)
+			if pos then
+				table.insert(hits, { path = file, lnum = i, col = pos, line = line })
+				break
+			end
+		end
+	end
+	return hits
 end
 
 local function read_java_methods(java_path, expected_namespace, method)
@@ -300,8 +345,16 @@ function M.jump()
 			vim.notify("mybatis.nvim: 无法解析当前 XML 映射", vim.log.levels.WARN)
 			return
 		end
-		local hits = collect_java_locations(ctx)
-		handle_results(hits, "MyBatis Java for " .. ctx.namespace .. "#" .. ctx.method)
+		if ctx.type == "include" then
+			local hits = find_local_defs(ctx.lines, ctx.file, { "sql" }, ctx.refid)
+			handle_results(hits, 'MyBatis <sql> for refid "' .. ctx.refid .. '"')
+		elseif ctx.type == "resultMap_ref" then
+			local hits = find_local_defs(ctx.lines, ctx.file, { "resultMap" }, ctx.result_map)
+			handle_results(hits, 'MyBatis <resultMap> for "' .. ctx.result_map .. '"')
+		else
+			local hits = collect_java_locations(ctx)
+			handle_results(hits, "MyBatis Java for " .. ctx.namespace .. "#" .. ctx.method)
+		end
 	else
 		vim.notify("mybatis.nvim: 只支持在 Java 或 XML 文件中跳转", vim.log.levels.WARN)
 	end
@@ -322,10 +375,24 @@ function M.jump_or_fallback()
 	elseif ft == "xml" then
 		local ctx = get_xml_context()
 		if ctx then
-			local hits = collect_java_locations(ctx)
-			if hits and #hits > 0 then
-				handle_results(hits, "MyBatis Java for " .. ctx.namespace .. "#" .. ctx.method)
-				return
+			if ctx.type == "include" then
+				local hits = find_local_defs(ctx.lines, ctx.file, { "sql" }, ctx.refid)
+				if hits and #hits > 0 then
+					handle_results(hits, 'MyBatis <sql> for refid "' .. ctx.refid .. '"')
+					return
+				end
+			elseif ctx.type == "resultMap_ref" then
+				local hits = find_local_defs(ctx.lines, ctx.file, { "resultMap" }, ctx.result_map)
+				if hits and #hits > 0 then
+					handle_results(hits, 'MyBatis <resultMap> for "' .. ctx.result_map .. '"')
+					return
+				end
+			else
+				local hits = collect_java_locations(ctx)
+				if hits and #hits > 0 then
+					handle_results(hits, "MyBatis Java for " .. ctx.namespace .. "#" .. ctx.method)
+					return
+				end
 			end
 		end
 	end
