@@ -39,6 +39,35 @@ local function matches_fqn(lines, expected_fqn)
 	return false
 end
 
+local function capitalize(str)
+	return (str:gsub("^%l", string.upper))
+end
+
+local function find_property_position(lines, property)
+	local pat = "%f[%w_]" .. vim.pesc(property) .. "%f[%W]"
+	for i, line in ipairs(lines) do
+		if line:find(pat) then
+			if line:find(";") and not line:find("%(") then
+				local col = line:find(pat)
+				return i, col, line
+			end
+		end
+	end
+	local setter = "set" .. capitalize(property)
+	local getter = "get" .. capitalize(property)
+	for i, line in ipairs(lines) do
+		local col = line:find("%f[%w_]" .. vim.pesc(setter) .. "%f[%W]")
+		if col then
+			return i, col, line
+		end
+		col = line:find("%f[%w_]" .. vim.pesc(getter) .. "%f[%W]")
+		if col then
+			return i, col, line
+		end
+	end
+	return nil
+end
+
 local function ordered_base_names(expected_fqn, target_name)
 	local base = target_name
 	if base == "" then
@@ -84,11 +113,18 @@ function M.collect(ctx, cfg)
 				seen[path] = true
 				local lines = fs.read_file_lines(path)
 				if lines and matches_fqn(lines, expected_fqn) then
-					local lnum, col, text = find_type_declaration(lines, target_name)
-					if lnum == 1 and base ~= target_name then
-						lnum, col, text = find_type_declaration(lines, base)
+					if ctx.property and ctx.property ~= "" then
+						local lnum, col, text = find_property_position(lines, ctx.property)
+						if lnum then
+							table.insert(hits, { path = path, lnum = lnum, col = col, line = text })
+						end
+					else
+						local lnum, col, text = find_type_declaration(lines, target_name)
+						if lnum == 1 and base ~= target_name then
+							lnum, col, text = find_type_declaration(lines, base)
+						end
+						table.insert(hits, { path = path, lnum = lnum, col = col, line = text })
 					end
-					table.insert(hits, { path = path, lnum = lnum, col = col, line = text })
 				end
 			end
 		end

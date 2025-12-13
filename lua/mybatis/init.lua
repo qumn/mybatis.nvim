@@ -103,6 +103,11 @@ local function resolve_current_jump(cfg)
 			return hits, ("Java type %s"):format(ctx.fqn), nil
 		end
 
+		if ctx.type == "result_property" then
+			local hits = class_locator.collect(ctx, cfg)
+			return hits, ("Java property %s"):format(ctx.property), nil
+		end
+
 		local hits = java_locator.collect(ctx, cfg)
 		return hits, ("MyBatis Java for %s#%s"):format(ctx.namespace, ctx.method), nil
 	end

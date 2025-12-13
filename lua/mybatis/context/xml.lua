@@ -16,7 +16,10 @@ local function java_type_name(fqn)
 	return last:match("([^$]+)$") or last
 end
 
-local function parse_attr_value(line, attr, cursor_col)
+local function extract_attr_positions(line, attr)
+	if not line then
+		return nil
+	end
 	local s, e, value = line:find(attr .. '%s*=%s*"([^"]+)"')
 	if not s then
 		s, e, value = line:find(attr .. "%s*=%s*'([^']+)'")
@@ -24,10 +27,36 @@ local function parse_attr_value(line, attr, cursor_col)
 	if not s then
 		return nil
 	end
+	return s, e, value
+end
+
+local function extract_attr(line, attr)
+	local _, _, value = extract_attr_positions(line, attr)
+	return value
+end
+
+local function parse_attr_value(line, attr, cursor_col)
+	local s, e, value = extract_attr_positions(line, attr)
+	if not s then
+		return nil
+	end
 	if cursor_col + 1 < s or cursor_col + 1 > e then
 		return nil
 	end
 	return value
+end
+
+local function find_result_map_type(start_line, lines)
+	for lnum = start_line, 1, -1 do
+		local line = lines[lnum]
+		if line and line:match("<%s*resultMap") then
+			local attr = extract_attr(line, "type")
+			if attr then
+				return attr
+			end
+		end
+	end
+	return nil
 end
 
 local function parse_include_refid(line)
@@ -98,6 +127,28 @@ function M.from_current(tags)
 				}
 			end
 		end
+	end
+
+	local property = nil
+	local property_line = nil
+	local cursor_col = cursor[2]
+	local line = cur_text
+	if line then
+		property = parse_attr_value(line, "property", cursor_col)
+		if property then
+			property_line = find_result_map_type(cursor[1], lines)
+		end
+	end
+
+	if property and property_line then
+		local fqn = normalize_java_type(property_line)
+		return {
+			type = "result_property",
+			file = file,
+			dir = start_dir,
+			fqn = fqn,
+			property = property,
+		}
 	end
 
 	local namespace = xml.extract_namespace(lines)
