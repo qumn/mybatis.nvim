@@ -3,14 +3,23 @@ local xml = require("mybatis.util.xml")
 
 local M = {}
 
-local function parse_include_refid(line)
-	return line:match('<include[^>]-refid%s*=%s*"([^"]+)"') or line:match("<include[^>]-refid%s*=%s*'([^']+)'")
+local function normalize_java_type(value)
+	local trimmed = vim.trim(value)
+	trimmed = trimmed:gsub("%s+", "")
+	trimmed = trimmed:gsub("%[%]$", "")
+	trimmed = trimmed:match("^[^<]+") or trimmed
+	return vim.trim(trimmed)
 end
 
-local function parse_result_map_ref(line, cursor_col)
-	local s, e, value = line:find('resultMap%s*=%s*"([^"]+)"')
+local function java_type_name(fqn)
+	local last = fqn:match("([%w_$]+)$") or fqn
+	return last:match("([^$]+)$") or last
+end
+
+local function parse_attr_value(line, attr, cursor_col)
+	local s, e, value = line:find(attr .. '%s*=%s*"([^"]+)"')
 	if not s then
-		s, e, value = line:find("resultMap%s*=%s*'([^']+)'")
+		s, e, value = line:find(attr .. "%s*=%s*'([^']+)'")
 	end
 	if not s then
 		return nil
@@ -19,6 +28,14 @@ local function parse_result_map_ref(line, cursor_col)
 		return nil
 	end
 	return value
+end
+
+local function parse_include_refid(line)
+	return line:match('<include[^>]-refid%s*=%s*"([^"]+)"') or line:match("<include[^>]-refid%s*=%s*'([^']+)'")
+end
+
+local function parse_result_map_ref(line, cursor_col)
+	return parse_attr_value(line, "resultMap", cursor_col)
 end
 
 function M.from_current(tags)
@@ -45,7 +62,8 @@ function M.from_current(tags)
 			}
 		end
 
-		local result_map = parse_result_map_ref(cur_text, cursor[2])
+		local cursor_col = cursor[2]
+		local result_map = parse_result_map_ref(cur_text, cursor_col)
 		if result_map then
 			return {
 				type = "resultMap_ref",
@@ -53,6 +71,32 @@ function M.from_current(tags)
 				lines = lines,
 				result_map = result_map,
 			}
+		end
+
+		local result_type = parse_attr_value(cur_text, "resultType", cursor_col)
+		if result_type then
+			local fqn = normalize_java_type(result_type)
+			return {
+				type = "java_type",
+				file = file,
+				dir = start_dir,
+				fqn = fqn,
+				name = java_type_name(fqn),
+			}
+		end
+
+		if cur_text:match("<%s*resultMap%f[%W]") then
+			local type_attr = parse_attr_value(cur_text, "type", cursor_col)
+			if type_attr then
+				local fqn = normalize_java_type(type_attr)
+				return {
+					type = "java_type",
+					file = file,
+					dir = start_dir,
+					fqn = fqn,
+					name = java_type_name(fqn),
+				}
+			end
 		end
 	end
 

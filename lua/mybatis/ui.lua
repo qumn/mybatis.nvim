@@ -20,7 +20,7 @@ end
 
 function M.handle_results(hits, title)
 	if #hits == 0 then
-		vim.notify("mybatis.nvim: No matching mapping found", vim.log.levels.INFO)
+		vim.notify("mybatis.nvim: No matches found", vim.log.levels.INFO)
 	elseif #hits == 1 then
 		open_location(hits[1])
 	else

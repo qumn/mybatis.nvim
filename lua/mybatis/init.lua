@@ -2,6 +2,7 @@ local config = require("mybatis.config")
 local java_context = require("mybatis.context.java")
 local xml_context = require("mybatis.context.xml")
 local java_locator = require("mybatis.locator.java")
+local class_locator = require("mybatis.locator.class")
 local xml_locator = require("mybatis.locator.xml")
 local ui = require("mybatis.ui")
 
@@ -95,6 +96,11 @@ local function resolve_current_jump(cfg)
 		if ctx.type == "resultMap_ref" then
 			local hits = xml_locator.find_local_defs(ctx.lines, ctx.file, { "resultMap" }, ctx.result_map)
 			return hits, ('MyBatis <resultMap> for "%s"'):format(ctx.result_map), nil
+		end
+
+		if ctx.type == "java_type" then
+			local hits = class_locator.collect(ctx, cfg)
+			return hits, ("Java type %s"):format(ctx.fqn), nil
 		end
 
 		local hits = java_locator.collect(ctx, cfg)

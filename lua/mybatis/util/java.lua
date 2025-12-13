@@ -11,7 +11,10 @@ function M.extract_package_and_class(lines)
 			end
 		end
 		if not class then
-			local m = line:match("^%s*interface%s+([%w_]+)") or line:match("^%s*public%s+interface%s+([%w_]+)")
+			local m = line:match("%f[%a]interface%f[%A]%s+([%w_]+)")
+				or line:match("%f[%a]class%f[%A]%s+([%w_]+)")
+				or line:match("%f[%a]enum%f[%A]%s+([%w_]+)")
+				or line:match("%f[%a]record%f[%A]%s+([%w_]+)")
 			if m then
 				class = m
 			end

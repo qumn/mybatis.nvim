@@ -8,6 +8,7 @@ Jump between MyBatis Java mapper interfaces and XML mapper files.
 - From XML `<... id="...">` → jump to matching Java mapper method
 - From XML `<include refid="...">` → jump to local `<sql id="...">`
 - From XML `resultMap="..."` (when cursor is on the attribute) → jump to local `<resultMap id="...">`
+- From XML `resultType="..."` / `<resultMap type="...">` (cursor on the attribute) → jump to Java type
 - Multiple matches open Quickfix
 
 ## Install
