@@ -3,6 +3,9 @@ local M = {}
 local defaults = {
 	root_markers = { ".git", "pom.xml", "build.gradle", "settings.gradle" },
 	mapper_tags = { "select", "insert", "update", "delete", "sql", "resultMap" },
+	search = {
+		exclude_dirnames = { "target", "build" },
+	},
 	mapper = {
 		filetypes = { "java", "xml" },
 		filename_patterns = { "Mapper%.java$", "Mapper%.xml$" },

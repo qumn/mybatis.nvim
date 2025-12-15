@@ -108,7 +108,7 @@ function M.collect(ctx, cfg)
 	local seen = {}
 	for _, base in ipairs(bases) do
 		local filename = base .. ".java"
-		for _, path in ipairs(fs.find_files_by_name(root, filename)) do
+		for _, path in ipairs(fs.find_files_by_name(root, filename, cfg.search)) do
 			if not seen[path] then
 				seen[path] = true
 				local lines = fs.read_file_lines(path)

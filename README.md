@@ -83,6 +83,9 @@ If you map `gd` to Telescope definitions, you can wrap it to be MyBatis-aware:
 require("mybatis").setup({
   root_markers = { ".git", "pom.xml", "build.gradle", "settings.gradle" }, -- project root markers for searching
   mapper_tags = { "select", "insert", "update", "delete", "sql", "resultMap" }, -- XML tags treated as mapping definitions
+  search = {
+    exclude_dirnames = { "target", "build" },
+  },
   mapper = {
     filetypes = { "java", "xml" }, -- filetypes eligible for MyBatis jump logic
     filename_patterns = { "Mapper%.java$", "Mapper%.xml$" }, -- Lua patterns; empty = no filename filtering
@@ -92,3 +95,5 @@ require("mybatis").setup({
   },
 })
 ```
+
+File searching prefers external tools when available: `fd` (or `fdfind`) first, then `rg`; otherwise it falls back to `vim.fs.find`.

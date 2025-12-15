@@ -35,7 +35,7 @@ end
 function M.collect(ctx, cfg)
 	local root = fs.find_project_root(ctx.dir, cfg.root_markers)
 	local java_name = ctx.class .. ".java"
-	local java_files = fs.find_files_by_name(root, java_name)
+	local java_files = fs.find_files_by_name(root, java_name, cfg.search)
 
 	local all_hits = {}
 	for _, path in ipairs(java_files) do
